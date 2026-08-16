@@ -1,0 +1,24 @@
+星尘回响 · Echoes of Stardust — 素材与代码许可说明
+====================================================
+
+本项目为个人本地学习作品，非商用、不公开发布。
+
+代码（core/ tools/ native/*.py run.py 等）：MIT License
+Copyright (c) 2026 焦汇坤
+
+第三方素材许可：
+
+1. 缝合像素字体 Fusion Pixel Font（assets/fonts/）
+   作者 TakWolf · SIL Open Font License 1.1（OFL-1.1）
+   https://github.com/TakWolf/fusion-pixel-font
+
+2. Kenney 素材（assets/particles/ ui/ audio/kenney*/ rpg/ 等）
+   CC0 1.0 Universal — 免费使用，无需署名
+   https://kenney.nl
+
+3. 竖琴 PNG（assets/sprites/harp_real.png）
+   pngimg.com · CC BY-NC 4.0（仅限非商业使用）
+   https://pngimg.com/image/24093
+
+4. 程序化生成素材（assets/audio/*.wav 音效/BGM、星球渲染）
+   本项目自研代码生成，随代码 MIT 授权
