@@ -7,20 +7,38 @@ import pygame
 from core import config, audio, ui
 from core.combat import notes as N
 
-# 探索点定义（坐标在 480x270 逻辑屏上）
+# 探索点定义（坐标在 480x270 逻辑屏上；walk=局部探索场景配置）
 POIS = [
     {"key": "boat",    "name": "渔夫的船",   "pos": (118, 150), "node": "open",
-     "icon": "船",    "desc": "老渔夫和小女孩在船头"},
+     "icon": "船",    "desc": "老渔夫和小女孩在船头",
+     "walk": {"bg": "beach1.png", "npc_pos": (290, 130), "npc_name": "老渔夫",
+               "npc_img": "adventurer_03/adventurer_03_1.png",
+               "enter": (70, 200), "exit": (30, 230)}},
     {"key": "mend",    "name": "沉底的渔网",  "pos": (330, 110), "node": "mend_net",
-     "icon": "网",    "desc": "用「水」音符把渔网托起来"},
+     "icon": "网",    "desc": "用「水」音符托起渔网",
+     "walk": {"bg": "HR_Ocean Sunrise.png", "npc_pos": (310, 140), "npc_name": "小女孩",
+               "npc_img": "adventurer_02/adventurer_02_00.png",
+               "enter": (60, 200), "exit": (30, 230)}},
     {"key": "oar",     "name": "迷雾船桨",   "pos": (92, 210),  "node": "find_oar",
-     "icon": "桨",    "desc": "用「风」音符吹散迷雾"},
+     "icon": "桨",    "desc": "用「风」音符吹散迷雾",
+     "walk": {"bg": "beach1.png", "npc_pos": (150, 120), "npc_name": "老渔夫",
+               "npc_img": "adventurer_03/adventurer_03_1.png",
+               "enter": (60, 200), "exit": (30, 230)}},
     {"key": "mist",    "name": "海雾·暗影",   "pos": (392, 160), "node": "battle",
-     "icon": "雾",    "desc": "「寂静」的爪牙嗅到了气息"},
+     "icon": "雾",    "desc": "「寂静」的爪牙",
+     "walk": {"bg": "HR_Ocean Sunrise.png", "npc_pos": (320, 130), "npc_name": "暗影兽",
+               "npc_img": "adventurer_05/adventurer_05_1.png",
+               "enter": (60, 200), "exit": (30, 230)}},
     {"key": "shells",  "name": "贝壳浅滩",    "pos": (238, 222), "node": "shells",
-     "icon": "贝",    "desc": "陪小女孩捡贝壳"},
+     "icon": "贝",    "desc": "陪小女孩捡贝壳",
+     "walk": {"bg": "beach1.png", "npc_pos": (230, 130), "npc_name": "小女孩",
+               "npc_img": "adventurer_02/adventurer_02_00.png",
+               "enter": (60, 200), "exit": (30, 230)}},
     {"key": "lamp",    "name": "灯塔夜谈",    "pos": (416, 62),  "node": "night",
-     "icon": "灯",    "desc": "雨夜，老渔夫的坦白"},
+     "icon": "灯",    "desc": "雨夜，老渔夫的坦白",
+     "walk": {"bg": "HR_Ocean Sunrise.png", "npc_pos": (340, 120), "npc_name": "老渔夫",
+               "npc_img": "adventurer_03/adventurer_03_1.png",
+               "enter": (60, 200), "exit": (30, 230)}},
 ]
 
 
@@ -81,10 +99,10 @@ class MapScene:
                                      c, 0.6])
 
     def _enter_poi(self, poi):
-        from core.story.scene import StoryScene
-        self.game.set_scene(StoryScene("qianhai", poi["node"], memory=self.memory,
-                                       fragments=self.fragments, mode="poi",
-                                       poi_key=poi["key"]))
+        # 进入 POI 局部探索场景：角色在里面移动，走近 NPC 对话
+        from core.story.walk_scene import WalkScene
+        self.game.set_scene(WalkScene(poi, self.memory, self.fragments,
+                                      list(self.pois_done)))
 
     def _all_done(self):
         return all(p["key"] in self.pois_done for p in POIS)
@@ -194,7 +212,7 @@ class MapScene:
         if self.guide_t > 0:
             blink = 0.5 + 0.5 * math.sin(self.t * 5)
             if blink > 0.3:
-                ui.text(s, "WASD 移动 · 走向光点 · 按 E 互动 · J/K/L/I 弹奏",
+                ui.text(s, "点击光点或按数字 1-6 · 进入地点探索 · WASD 移动找 NPC",
                         (config.W // 2, 60), size=12, color=config.GOLD_HI, center=True)
         # 互动提示
         if self.near:
