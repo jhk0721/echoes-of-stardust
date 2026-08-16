@@ -8,25 +8,70 @@ import pygame
 from core import config, audio, ui
 
 NPC_DIR = "assets/_new/Lively_NPCs_v3.0/individual sprites/medieval"
+SEA_DIR = "assets/_new/FREE - Pixel Art Sidescroller Sea Backgrounds"
+
+# Sea 分层背景（1024×346，按层序叠加 → 缩放 480×270）
+_sea_cache = {}
 
 
-def _load_img(path, size=None):
-    try:
-        img = pygame.image.load(path).convert_alpha()
-        if size:
-            img = pygame.transform.scale(img, size)
-        return img
-    except Exception:
+def _sea_layer(name):
+    if name in _sea_cache:
+        return _sea_cache[name]
+    import glob
+    p = glob.glob(f"{SEA_DIR}/**/{name}.png", recursive=True)
+    if not p:
         return None
+    img = pygame.image.load(p[0])
+    img = pygame.transform.scale(img, (config.W, config.H))
+    _sea_cache[name] = img
+    return img
+
+
+def _make_sea_bg(day=True, boat=False):
+    """组合海景：天空 + 远海 + 船 + 近海 + 云 + 太阳/月亮"""
+    s = pygame.Surface((config.W, config.H))
+    layers = ["BG_DAY" if day else "BG_NIGHT",
+              "OCEANB_DAY" if day else "OCEANB_NIGHT",
+              "BOAT" if boat else None,
+              "OCEANF_DAY" if day else "OCEANF_NIGHT",
+              "CLOUDS_DAY" if day else "CLOUDS_NIGHT",
+              "SUN_DAY" if day else "MOON_NIGHT"]
+    for L in layers:
+        if not L:
+            continue
+        img = _sea_layer(L)
+        if img:
+            s.blit(img, (0, 0))
+    return s
 
 
 def _bg_img(name):
+    if name == "sea_boat":
+        return _make_sea_bg(day=True, boat=True)
+    if name == "sea":
+        return _make_sea_bg(day=True)
+    if name == "sea_night":
+        return _make_sea_bg(day=False)
     for root in ("assets/_new",):
         p = os.path.join(root, name)
         if os.path.exists(p):
             img = pygame.image.load(p)
             return pygame.transform.scale(img, (config.W, config.H))
     return None
+
+
+def _npc_img(path, size=(40, 48)):
+    """加载 NPC 图（支持切 Wraith 帧）"""
+    try:
+        if "Wraith" in path:
+            sheet = pygame.image.load(path).convert_alpha()
+            img = sheet.subsurface((0, 0, 16, 16))
+        else:
+            img = pygame.image.load(path).convert_alpha()
+        img = pygame.transform.scale(img, size)
+        return img
+    except Exception:
+        return None
 
 
 class WalkScene:
@@ -38,14 +83,13 @@ class WalkScene:
         self.fragments = fragments or []
         self.pois_done = set(pois_done or [])
         w = poi.get("walk", {})
-        self.bg = _bg_img(w.get("bg", "HR_Ocean Sunrise.png"))
+        self.bg = _bg_img(w.get("bg", "sea"))
         # 玩家：从入口进入
         self.player = pygame.Vector2(w.get("enter", (60, 200)))
         # NPC：站在场景中
         self.npc_pos = w.get("npc_pos", (300, 130))
         self.npc_name = w.get("npc_name", "记忆体")
-        npc_img = w.get("npc_img", "adventurer_01/adventurer_01_00.png")
-        self.npc_img = _load_img(os.path.join(NPC_DIR, npc_img), (40, 48))
+        self.npc_img = _npc_img(w.get("npc_img", ""), w.get("npc_size", (40, 48)))
         self.exit_pos = w.get("exit", (30, 230))
         self.t = 0.0
         self.toast = ""

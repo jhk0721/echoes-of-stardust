@@ -7,37 +7,40 @@ import pygame
 from core import config, audio, ui
 from core.combat import notes as N
 
-# 探索点定义（坐标在 480x270 逻辑屏上；walk=局部探索场景配置）
+NPC_DIR = "assets/_new/Lively_NPCs_v3.0/individual sprites/medieval"
+
+# 探索点定义（walk=局部探索场景：背景/NPC/入口/出口）
+WR = "assets/_new/Bitcrawl_Free_Roguelike_v1/Characters/Normal_Outline_Sheet/Animation_Normal_Outline_Wraith.png"
 POIS = [
     {"key": "boat",    "name": "渔夫的船",   "pos": (118, 150), "node": "open",
      "icon": "船",    "desc": "老渔夫和小女孩在船头",
-     "walk": {"bg": "beach1.png", "npc_pos": (290, 130), "npc_name": "老渔夫",
-               "npc_img": "adventurer_03/adventurer_03_1.png",
+     "walk": {"bg": "sea_boat", "npc_pos": (300, 195), "npc_name": "老渔夫",
+               "npc_img": f"{NPC_DIR}/elder/elder_1.png",
                "enter": (70, 200), "exit": (30, 230)}},
     {"key": "mend",    "name": "沉底的渔网",  "pos": (330, 110), "node": "mend_net",
      "icon": "网",    "desc": "用「水」音符托起渔网",
-     "walk": {"bg": "HR_Ocean Sunrise.png", "npc_pos": (310, 140), "npc_name": "小女孩",
-               "npc_img": "adventurer_02/adventurer_02_00.png",
+     "walk": {"bg": "sea", "npc_pos": (300, 200), "npc_name": "小女孩",
+               "npc_img": f"{NPC_DIR}/princess/princess_1.png",
                "enter": (60, 200), "exit": (30, 230)}},
     {"key": "oar",     "name": "迷雾船桨",   "pos": (92, 210),  "node": "find_oar",
      "icon": "桨",    "desc": "用「风」音符吹散迷雾",
-     "walk": {"bg": "beach1.png", "npc_pos": (150, 120), "npc_name": "老渔夫",
-               "npc_img": "adventurer_03/adventurer_03_1.png",
+     "walk": {"bg": "sea", "npc_pos": (150, 195), "npc_name": "老渔夫",
+               "npc_img": f"{NPC_DIR}/elder/elder_1.png",
                "enter": (60, 200), "exit": (30, 230)}},
     {"key": "mist",    "name": "海雾·暗影",   "pos": (392, 160), "node": "battle",
      "icon": "雾",    "desc": "「寂静」的爪牙",
-     "walk": {"bg": "HR_Ocean Sunrise.png", "npc_pos": (320, 130), "npc_name": "暗影兽",
-               "npc_img": "adventurer_05/adventurer_05_1.png",
+     "walk": {"bg": "sea_night", "npc_pos": (300, 195), "npc_name": "暗影兽",
+               "npc_img": WR, "npc_size": (48, 48),
                "enter": (60, 200), "exit": (30, 230)}},
     {"key": "shells",  "name": "贝壳浅滩",    "pos": (238, 222), "node": "shells",
      "icon": "贝",    "desc": "陪小女孩捡贝壳",
-     "walk": {"bg": "beach1.png", "npc_pos": (230, 130), "npc_name": "小女孩",
-               "npc_img": "adventurer_02/adventurer_02_00.png",
+     "walk": {"bg": "beach1.png", "npc_pos": (240, 205), "npc_name": "小女孩",
+               "npc_img": f"{NPC_DIR}/princess/princess_1.png",
                "enter": (60, 200), "exit": (30, 230)}},
     {"key": "lamp",    "name": "灯塔夜谈",    "pos": (416, 62),  "node": "night",
      "icon": "灯",    "desc": "雨夜，老渔夫的坦白",
-     "walk": {"bg": "HR_Ocean Sunrise.png", "npc_pos": (340, 120), "npc_name": "老渔夫",
-               "npc_img": "adventurer_03/adventurer_03_1.png",
+     "walk": {"bg": "sea_night", "npc_pos": (340, 195), "npc_name": "老渔夫",
+               "npc_img": f"{NPC_DIR}/elder/elder_1.png",
                "enter": (60, 200), "exit": (30, 230)}},
 ]
 
