@@ -1,39 +1,30 @@
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
+*.egg-info/
 .venv/
 venv/
-env/
-ENV/
 
-# IDE
+# 安全：SSH 密钥绝不入库
+.ssh/
+
+# 大压缩包（已解压，勿重复提交）
+*.zip
+*.rar
+
+# 运行时产物
+save.json
+_dl/
+docs/*.png
+
+# 临时工具
+tools_clean2.py
+tools_dns_test.py
+tools_ssl_test.py
+fix_hosts.py
+
+# IDE / OS
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
 Thumbs.db
-
-# Game specific
-save.json
-*.log
-
-# Assets (large files)
-assets/stardew/素材/星露谷物语素材/Stardew valley/Characters/*.png
-assets/undertale/Characters/*.png
-
-# Temp files
-*.tmp
-*.temp
-check_*.py
-fix_*.py
-test_*.py
+.DS_Store

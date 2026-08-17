@@ -1,4 +1,5 @@
 # 主程序：场景管理器 / 主界面（星尘粒子增强版）/ 织曲战斗
+import ctypes
 import math
 import os
 import random
@@ -15,6 +16,15 @@ from native import planet_shader as PS
 IMG = {}
 PART = {}      # 粒子族：{"star": [surf...], "circle": [...], ...}（Kenney CC0）
 SCALE_CACHE = {}
+
+
+def force_english_ime():
+    """输入法防护：启动时把系统输入法切到美式英文（防止拼音吃掉 JKL/E 等热键）"""
+    try:
+        ctypes.windll.user32.LoadKeyboardLayoutW("00000409", 0x00000001)  # KLF_ACTIVATE
+        return True
+    except Exception:
+        return False
 
 
 def img(name):
@@ -129,6 +139,8 @@ class Game:
         self.clock = pygame.time.Clock()
         self.scene = None
         self.running = True
+        self.paused = False
+        force_english_ime()                  # 输入法防护：切英文键盘
         for name in ("harp_real",):
             try:
                 IMG[name] = pygame.image.load(f"{config.SPRITES}/{name}.png")
@@ -149,10 +161,12 @@ class Game:
             for e in pygame.event.get():
                 if e.type == pygame.QUIT:
                     self.running = False
-                elif e.type == pygame.VIDEORESIZE:
+                    continue
+                if e.type == pygame.VIDEORESIZE:
                     self.screen = pygame.display.set_mode((e.w, e.h), pygame.RESIZABLE)
-                elif e.type == pygame.KEYDOWN:
-                    # 全局热键：Ctrl+S 手动存档
+                    continue
+                if e.type == pygame.KEYDOWN:
+                    # 全局热键：Ctrl+S 手动存档 / F11 全屏
                     if e.key == pygame.K_s and pygame.key.get_mods() & pygame.KMOD_CTRL:
                         self._manual_save()
                         continue
@@ -162,10 +176,22 @@ class Game:
                             self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
                         else:
                             self.screen = pygame.display.set_mode((config.SW, config.SH),
-                                                                pygame.RESIZABLE)
+                                                                 pygame.RESIZABLE)
                         continue
-                elif self.scene:
+                if self.scene:
                     self.scene.event(e)
+            # 失焦自动暂停：窗口没焦点时冻结游戏，提示点击继续
+            focused = pygame.key.get_focused()
+            if not focused:
+                self.paused = True
+            elif focused and self.paused:
+                self.paused = False
+            if self.paused:
+                self.surf.fill(config.INK)
+                self._draw_pause(self.surf)
+                pygame.transform.scale(self.surf, self.screen.get_size(), self.screen)
+                pygame.display.flip()
+                continue
             if self.scene:
                 self.scene.update(dt)
             self.surf.fill(config.INK)
@@ -174,6 +200,20 @@ class Game:
             pygame.transform.scale(self.surf, self.screen.get_size(), self.screen)
             pygame.display.flip()
         pygame.quit()
+
+    def _draw_pause(self, s):
+        """失焦暂停画面"""
+        s.fill((2, 3, 10))
+        f = pygame.Surface((config.W, config.H), pygame.SRCALPHA)
+        f.fill((6, 10, 30, 200))
+        s.blit(f, (0, 0))
+        ui.text(s, "⏸ 已暂停", (config.W // 2, config.H // 2 - 24), size=24,
+                color=config.GOLD_HI, center=True)
+        ui.text(s, "点击游戏窗口继续", (config.W // 2, config.H // 2 + 10), size=12,
+                color=config.STAR, center=True)
+        ui.text(s, "输入法请保持英文状态（中文输入法会吞按键）",
+                (config.W // 2, config.H // 2 + 34), size=10,
+                color=(150, 170, 210), center=True)
 
     def _manual_save(self):
         """Ctrl+S 手动存档"""
