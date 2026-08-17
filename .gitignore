@@ -22,6 +22,10 @@ tools_clean2.py
 tools_dns_test.py
 tools_ssl_test.py
 fix_hosts.py
+check_*.py
+fix_main.py
+test_save.py
+修复GitHub访问.bat
 
 # IDE / OS
 .vscode/
