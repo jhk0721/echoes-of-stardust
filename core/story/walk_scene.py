@@ -77,8 +77,9 @@ def _npc_img(path, size=(40, 48)):
 class WalkScene:
     """POI 局部场景：进入 → 自由移动 → 走近 NPC 按 E 对话 → 出口回大世界"""
 
-    def __init__(self, poi, memory=None, fragments=None, pois_done=None):
+    def __init__(self, poi, memory=None, fragments=None, pois_done=None, planet_key="qianhai"):
         self.poi = poi
+        self.planet_key = planet_key
         self.memory = memory or {"主线": 0, "互动": 0, "残片": 0, "聆听": 0}
         self.fragments = fragments or []
         self.pois_done = set(pois_done or [])
@@ -119,13 +120,14 @@ class WalkScene:
 
     def _talk(self):
         from core.story.scene import StoryScene
-        self.game.set_scene(StoryScene("qianhai", self.poi["node"],
+        self.game.set_scene(StoryScene(self.planet_key, self.poi["node"],
                                        memory=self.memory, fragments=self.fragments,
                                        mode="poi", poi_key=self.poi["key"]))
 
     def _back_map(self):
         from core.story.map_scene import MapScene
-        self.game.set_scene(MapScene(self.memory, self.fragments, list(self.pois_done)))
+        self.game.set_scene(MapScene(self.planet_key, self.memory, self.fragments,
+                                     list(self.pois_done)))
 
     # ------------------------------------------------------------- 更新
     def update(self, dt):

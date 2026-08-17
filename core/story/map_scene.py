@@ -14,7 +14,7 @@ WR = "assets/_new/Bitcrawl_Free_Roguelike_v1/Characters/Normal_Outline_Sheet/Ani
 POIS = [
     {"key": "boat",    "name": "渔夫的船",   "pos": (118, 150), "node": "open",
      "icon": "船",    "desc": "老渔夫和小女孩在船头",
-     "walk": {"bg": "sea_boat", "npc_pos": (300, 195), "npc_name": "老渔夫",
+     "walk": {"bg": "sea_night", "npc_pos": (300, 195), "npc_name": "老渔夫",
                "npc_img": f"{NPC_DIR}/elder/elder_1.png",
                "enter": (70, 200), "exit": (30, 230)}},
     {"key": "mend",    "name": "沉底的渔网",  "pos": (330, 110), "node": "mend_net",
@@ -46,13 +46,38 @@ POIS = [
 
 
 class MapScene:
-    """自由探索：浅海星海岸，玩家漫游触发探索点"""
+    """自由探索：星球大世界，玩家漫游触发探索点"""
 
-    def __init__(self, memory=None, fragments=None, pois=None):
+    def __init__(self, planet_key="qianhai", memory=None, fragments=None, pois=None):
         self.t = 0.0
+        self.planet_key = planet_key
+        from core.story.worlds import WORLDS
+        self.wdata = WORLDS.get(planet_key, WORLDS["qianhai"])
+        self.planet_name = self.wdata["name"]
         self.memory = memory or {"主线": 0, "互动": 0, "残片": 0, "聆听": 0}
         self.fragments = fragments or []
         self.pois_done = set(pois or [])
+        # 探索点：浅海星 6 点完整；其他星球 3 点（对话/碎片/挽歌）
+        if planet_key == "qianhai":
+            self.pois = POIS
+        else:
+            npc = self.wdata.get("npc", "记忆体")
+            self.pois = [
+                {"key": "talk",    "name": npc,          "pos": (300, 150),
+                 "node": "talk",   "icon": "谈", "desc": f"与{npc}对话",
+                 "walk": {"bg": "sea_boat" if planet_key == "notre_dame" else "sea",
+                           "npc_pos": (300, 195), "npc_name": npc,
+                           "npc_img": f"{NPC_DIR}/villager_01/villager_01_00.png",
+                           "enter": (60, 200), "exit": (30, 230)}},
+                {"key": "frag",    "name": "记忆碎片",   "pos": (150, 90),
+                 "node": "frag",   "icon": "忆", "desc": "拾取一段发光的记忆",
+                 "walk": {"bg": "sea", "npc_pos": (160, 190), "npc_name": "发光的碎片",
+                           "npc_img": "", "enter": (60, 200), "exit": (30, 230)}},
+                {"key": "finale",  "name": "挽歌",       "pos": (400, 210),
+                 "node": "finale", "icon": "挽", "desc": "弹响终章挽歌",
+                 "walk": {"bg": "sea_night", "npc_pos": (360, 195), "npc_name": "星光船",
+                           "npc_img": "", "enter": (60, 200), "exit": (30, 230)}},
+            ]
         self.player = pygame.Vector2(config.W // 2, config.H * 0.60)
         self.near = None
         self.toast = ""
@@ -105,10 +130,10 @@ class MapScene:
         # 进入 POI 局部探索场景：角色在里面移动，走近 NPC 对话
         from core.story.walk_scene import WalkScene
         self.game.set_scene(WalkScene(poi, self.memory, self.fragments,
-                                      list(self.pois_done)))
+                                      list(self.pois_done), planet_key=self.planet_key))
 
     def _all_done(self):
-        return all(p["key"] in self.pois_done for p in POIS)
+        return all(p["key"] in self.pois_done for p in self.pois)
 
     # ------------------------------------------------------------- 更新
     def update(self, dt):
@@ -140,7 +165,7 @@ class MapScene:
         # 最近的未完成探索点
         self.near = None
         best = 46
-        for p in POIS:
+        for p in self.pois:
             if p["key"] in self.pois_done:
                 continue
             d = math.hypot(p["pos"][0] - self.player.x, p["pos"][1] - self.player.y)
@@ -152,27 +177,33 @@ class MapScene:
         audio.play_loop("bgm", 0.30)
 
     # ------------------------------------------------------------- 绘制
-    def draw(self, s):
+    def _draw_bg(self, s):
+        """星球氛围背景（按星球色调）"""
+        t = self.wdata.get("tone", (10, 16, 48))
         sea_top = config.H - 84
-        # 夜空
         for y in range(sea_top):
-            t = y / sea_top
-            r = int(14 * (1.5 - t * 0.6))
-            g = int(24 * (1.5 - t * 0.6))
-            b = int(60 * (1.5 - t * 0.6))
-            s.fill((r, g, b), (0, y, config.W, 1))
+            k = y / sea_top
+            s.fill((min(255, int(t[0] * (1.4 - k * 0.5))),
+                    min(255, int(t[1] * (1.4 - k * 0.5))),
+                    min(255, int(t[2] * (1.4 - k * 0.5)))), (0, y, config.W, 1))
         for st in self.stars:
             st.draw(s)
-        # 海面
         sea = pygame.Surface((config.W, 84), pygame.SRCALPHA)
         for y in range(84):
             a = int(170 * (1 - y / 84))
-            sea.fill((26, 62, 118, a), (0, y, config.W, 1))
+            sea.fill((min(255, t[0] + 16), min(255, t[1] + 40), min(255, t[2] + 60), a),
+                     (0, y, config.W, 1))
         s.blit(sea, (0, sea_top))
         for wv in self.waves:
             x = int(wv["x"] + math.sin(self.t * 1.2 + wv["ph"]) * 8)
             y = sea_top + int((wv["ph"] * 37) % 70)
             pygame.draw.ellipse(s, (90, 130, 190, 60), (x, y, 26, 3))
+        ui.text(s, self.planet_name, (config.W // 2, 6), size=12,
+                color=(235, 225, 200), center=True)
+
+    def draw(self, s):
+        self._draw_bg(s)
+        sea_top = config.H - 84
         # 灯塔剪影
         lx, ly = config.W - 46, sea_top - 42
         pygame.draw.rect(s, (46, 52, 86), (lx - 3, ly + 12, 6, 40))
@@ -180,7 +211,7 @@ class MapScene:
         blink = 0.5 + 0.5 * math.sin(self.lamp_t * 1.6)
         pygame.draw.circle(s, (255, 240, 180), (lx, ly), int(2 + blink * 3))
         # 探索点
-        for i, p in enumerate(POIS):
+        for i, p in enumerate(self.pois):
             done = p["key"] in self.pois_done
             px, py = p["pos"]
             if done:

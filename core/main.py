@@ -385,8 +385,8 @@ class TitleScene:
         if name == "新旅程":
             from core import save as S
             S.new_game()
-            from core.story.map_scene import MapScene
-            self.game.set_scene(MapScene())
+            from core.story.planet_select import PlanetSelectScene
+            self.game.set_scene(PlanetSelectScene())
         elif name == "继续聆听":
             from core import save as S
             d = S.load()

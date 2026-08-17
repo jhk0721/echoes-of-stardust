@@ -34,10 +34,26 @@ class StoryScene:
 
     def __init__(self, planet_key="qianhai", scene_key="open", memory=None, fragments=None,
                  mode="story", poi_key=None):
-        self.planet = QIANHAI
+        from core.story.worlds import WORLDS
+        w = WORLDS.get(planet_key, WORLDS["qianhai"])
+        self.planet_key = planet_key
+        self.wdata = w
+        # 场景：浅海星用完整 QIANHAI；其他星球用 worlds 数据 + frag/finale 合成
+        if planet_key == "qianhai":
+            scenes = dict(QIANHAI["scenes"])
+        else:
+            scenes = dict(w.get("scenes") or {})
+            scenes.setdefault("frag", {"dim": "残片", "fragments": "记忆碎片",
+                "lines": [{"who": "", "text": "（你拾起一段发光的记忆——它沉甸甸的，像一颗没来得及说的话。）"}]})
+            scenes.setdefault("finale", {"dim": "主线", "finale": True,
+                "lines": [{"who": "", "text": f"（挽歌奏响。{w['name']}的记忆归于星尘。）"}]})
+        self.scenes = scenes
         self.scene_key = scene_key
-        self.scene = self.planet["scenes"][scene_key]
-        self.bg = BG.get(scene_key, BG["open"])
+        self.scene = scenes[scene_key]
+        # 背景：星球色调
+        t = w.get("tone", (10, 16, 48))
+        self.bg = {"sky": t, "sea": tuple(min(255, c + 24) for c in t),
+                   "sun": None, "fog": 0.12, "lamp": False}
         self.mode = mode                # story 线性 / poi 探索点 / tutorial 教程
         self.poi_key = poi_key
         self.flash = 0.0                # 互动成功白闪
@@ -183,7 +199,7 @@ class StoryScene:
         nxt = sc.get("next")
         if nxt:
             self.scene_key = nxt
-            self.scene = self.planet["scenes"][nxt]
+            self.scene = self.scenes[nxt]
             self.state = "lines"
             self.line_i = 0
             self.char_i = 0
@@ -220,17 +236,17 @@ class StoryScene:
         if frag and frag not in self.fragments:
             self.fragments.append(frag)
             self._toast(f"获得记忆残片 · {frag}")
-        S.save({"planet": "qianhai", "scene": self.scene_key,
+        S.save({"planet": self.planet_key, "scene": self.scene_key,
                 "fragments": self.fragments, "memory": self.memory,
-                "pois": pois, "done": False, "unlocked": ["qianhai"]})
+                "pois": pois, "done": False, "unlocked": [self.planet_key]})
         from core.story.map_scene import MapScene
-        self.game.set_scene(MapScene(self.memory, self.fragments, pois))
+        self.game.set_scene(MapScene(self.planet_key, self.memory, self.fragments, pois))
 
     def _save(self):
         from core import save as S
-        S.save({"planet": "qianhai", "scene": self.scene_key,
+        S.save({"planet": self.planet_key, "scene": self.scene_key,
                 "fragments": self.fragments, "memory": self.memory,
-                "done": self.state == "done", "unlocked": ["qianhai"]})
+                "done": self.state == "done", "unlocked": [self.planet_key]})
 
     def _back_title(self):
         from core.main import TitleScene
