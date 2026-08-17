@@ -7,6 +7,51 @@
 
 The universe is a song coming to an end. What you play is not a requiem — it is testimony.
 
+---
+
+## 🔥 Legendary Settings That Make Your Heart Race
+
+> These are the romance unique to Echoes of Stardust — written deep into the code.
+
+### 🎼 Weaving Combat · The Four-Element Counterpoint Law
+
+**J Wind · K Fire · L Water · I Earth** — what you play is not a skill, it is a **movement**.
+
+- **Unison**: identical adjacent notes → +50% damage, pure resonance
+- **Counterpoint Fusion**: fire × water → **steam mist**; wind × earth → **sandstorm**
+- **Rest & Afterglow**: a note after a rest → damage **×2** — the power of silence
+
+### ⭐ The Ten Memorized Melodies · Legendary Finishers
+
+Witness the stories, then write your **unforgettable memories** into the staff as note sequences to play a legend:
+
+| Memorized Melody | Effect |
+|---|---|
+| **Nibelungen in the Rainy Night** | Hidden for 15s · double movement |
+| **Quasimodo's Bell** | Bronze bell blessing · death-immunity shield |
+| **Do Not Go Gentle into That Good Night** | 200% damage · piercing burn |
+| **The Letter to Eri** | Falling sakura — she received it |
+| **The Answer of the Dark Forest** | Hidden 5s · next hit **×10** |
+| **Ango's Revenge** | Folding-knife form · 300% damage |
+| **The Unfinished Poem** | Poem-verse form · the enemy leaves on its own |
+| **The Lone Traveler's Lantern** | Become a lighthouse for 20s |
+| **Dance of the Broken Mirror** | Mirror reflection · bond-shared damage |
+| **The Name in the Flower Field** | A guardian spirit appears |
+
+### 🌀 Listening · The Slow-Motion Weakness
+
+Hold **U** — time slows to **30%**. The enemy's rhythm pattern is laid bare on the staff. At that moment you are not just a musician; you are the **seer**.
+
+### 🌌 Memory Planets · Dying Means a Dirge
+
+Every planet is a memory. Advance through **Story / Interaction / Fragments / Listening**; at 100%, play the dirge and the planet turns to stardust. Everyone you bid farewell is someone who refused to be forgotten.
+
+### 🪐 16 Planets · 5 Main Chapters + Free Exploration
+
+Shallows Star → Storm Shadowed City → Notre-Dame → Dimensionally-reduced Ruins → Journey of the Finale. After the 5 chapters, unlock free exploration of 16 planets: Qiantang Temple, Kassel, the Library, Math Wasteland, B-612… each with its own story and NPCs.
+
+---
+
 ## ✨ Core Gameplay
 
 - **Free Exploration**: Stardew Valley-style top-down map, WASD to move, press E / click / number keys near exploration points
@@ -32,12 +77,44 @@ The universe is a song coming to an end. What you play is not a requiem — it i
 
 > Keep your input method in English mode — a Chinese IME will swallow key presses.
 
-## 🚀 Run
+## 🚀 Install & Run
+
+**Requirements**: Windows 10/11 · Python 3.10+ · any GPU (runs fine without GPU, auto-degrades)
+
+### Step 1: Install Python
+
+Download Python 3.10+ from [python.org](https://www.python.org/downloads/).
+**Make sure to check "Add Python to PATH"** during installation.
+
+### Step 2: Download & Extract
 
 ```bash
-pip install -r requirements.txt    # pygame etc.
-python run.py                      # first run generates assets + sets MX150 GPU
+git clone https://github.com/jhk0721/echoes-of-stardust.git
+cd echoes-of-stardust
 ```
+
+Or click the green **Code → Download ZIP** button on the repo page and extract.
+
+### Step 3: Install Dependencies
+
+```bash
+pip install -r requirements.txt    # just pygame
+```
+
+### Step 4: Launch
+
+```bash
+python run.py                      # first run auto-generates assets + sets MX150 GPU
+```
+
+Or simply double-click **`启动游戏.bat`**.
+
+> Tip: if the .bat flashes and closes, use `python run.py` instead — the console will show the error.
+
+### Assets Note
+
+The first run auto-generates all SFX/BGM/planet textures (purely procedural, no downloads needed).
+The Kenney asset packs in `assets/` are optional enhancements — the game runs fine without them.
 
 ## 🧪 Tests
 
