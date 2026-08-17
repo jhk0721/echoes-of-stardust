@@ -6,42 +6,36 @@ import pygame
 
 from core import config, audio, ui
 from core.combat import notes as N
-
-NPC_DIR = "assets/_new/Lively_NPCs_v3.0/individual sprites/medieval"
+from core.story import sd
 
 # 探索点定义（walk=局部探索场景：背景/NPC/入口/出口）
-WR = "assets/_new/Bitcrawl_Free_Roguelike_v1/Characters/Normal_Outline_Sheet/Animation_Normal_Outline_Wraith.png"
+# npc_img 不再需要，walk_scene 通过 sd.char_idle(npc_name) 自动解析
 POIS = [
     {"key": "boat",    "name": "渔夫的船",   "pos": (118, 150), "node": "open",
-     "icon": "船",    "desc": "老渔夫和小女孩在船头",
-     "walk": {"bg": "sea_night", "npc_pos": (300, 195), "npc_name": "老渔夫",
-               "npc_img": f"{NPC_DIR}/elder/elder_1.png",
-               "enter": (70, 200), "exit": (30, 230)}},
+      "icon": "船",    "desc": "老渔夫和小女孩在船头",
+      "walk": {"bg": "sea_night", "npc_pos": (300, 195), "npc_name": "老渔夫",
+                "enter": (70, 200), "exit": (30, 230)}},
     {"key": "mend",    "name": "沉底的渔网",  "pos": (330, 110), "node": "mend_net",
-     "icon": "网",    "desc": "用「水」音符托起渔网",
-     "walk": {"bg": "sea", "npc_pos": (300, 200), "npc_name": "小女孩",
-               "npc_img": f"{NPC_DIR}/princess/princess_1.png",
-               "enter": (60, 200), "exit": (30, 230)}},
+      "icon": "网",    "desc": "用「水」音符托起渔网",
+      "walk": {"bg": "sea", "npc_pos": (300, 200), "npc_name": "小女孩",
+                "enter": (60, 200), "exit": (30, 230)}},
     {"key": "oar",     "name": "迷雾船桨",   "pos": (92, 210),  "node": "find_oar",
-     "icon": "桨",    "desc": "用「风」音符吹散迷雾",
-     "walk": {"bg": "sea", "npc_pos": (150, 195), "npc_name": "老渔夫",
-               "npc_img": f"{NPC_DIR}/elder/elder_1.png",
-               "enter": (60, 200), "exit": (30, 230)}},
+      "icon": "桨",    "desc": "用「风」音符吹散迷雾",
+      "walk": {"bg": "sea", "npc_pos": (150, 195), "npc_name": "老渔夫",
+                "enter": (60, 200), "exit": (30, 230)}},
     {"key": "mist",    "name": "海雾·暗影",   "pos": (392, 160), "node": "battle",
-     "icon": "雾",    "desc": "「寂静」的爪牙",
-     "walk": {"bg": "sea_night", "npc_pos": (300, 195), "npc_name": "暗影兽",
-               "npc_img": WR, "npc_size": (48, 48),
-               "enter": (60, 200), "exit": (30, 230)}},
+      "icon": "雾",    "desc": "「寂静」的爪牙",
+      "walk": {"bg": "sea_night", "npc_pos": (300, 195), "npc_name": "暗影兽",
+                "npc_size": (48, 48),
+                "enter": (60, 200), "exit": (30, 230)}},
     {"key": "shells",  "name": "贝壳浅滩",    "pos": (238, 222), "node": "shells",
-     "icon": "贝",    "desc": "陪小女孩捡贝壳",
-     "walk": {"bg": "beach1.png", "npc_pos": (240, 205), "npc_name": "小女孩",
-               "npc_img": f"{NPC_DIR}/princess/princess_1.png",
-               "enter": (60, 200), "exit": (30, 230)}},
+      "icon": "贝",    "desc": "陪小女孩捡贝壳",
+      "walk": {"bg": "beach", "npc_pos": (240, 205), "npc_name": "小女孩",
+                "enter": (60, 200), "exit": (30, 230)}},
     {"key": "lamp",    "name": "灯塔夜谈",    "pos": (416, 62),  "node": "night",
-     "icon": "灯",    "desc": "雨夜，老渔夫的坦白",
-     "walk": {"bg": "sea_night", "npc_pos": (340, 195), "npc_name": "老渔夫",
-               "npc_img": f"{NPC_DIR}/elder/elder_1.png",
-               "enter": (60, 200), "exit": (30, 230)}},
+      "icon": "灯",    "desc": "雨夜，老渔夫的坦白",
+      "walk": {"bg": "sea_night", "npc_pos": (340, 195), "npc_name": "老渔夫",
+                "enter": (60, 200), "exit": (30, 230)}},
 ]
 
 
@@ -57,7 +51,7 @@ class MapScene:
         self.memory = memory or {"主线": 0, "互动": 0, "残片": 0, "聆听": 0}
         self.fragments = fragments or []
         self.pois_done = set(pois or [])
-        # 探索点：浅海星 6 点完整；其他星球 3 点（对话/碎片/挽歌）
+# 探索点：浅海星 6 点完整；其他星球 3 点（对话/碎片/挽歌）
         if planet_key == "qianhai":
             self.pois = POIS
         else:
@@ -66,17 +60,16 @@ class MapScene:
                 {"key": "talk",    "name": npc,          "pos": (300, 150),
                  "node": "talk",   "icon": "谈", "desc": f"与{npc}对话",
                  "walk": {"bg": "sea_boat" if planet_key == "notre_dame" else "sea",
-                           "npc_pos": (300, 195), "npc_name": npc,
-                           "npc_img": f"{NPC_DIR}/villager_01/villager_01_00.png",
-                           "enter": (60, 200), "exit": (30, 230)}},
+                          "npc_pos": (300, 195), "npc_name": npc,
+                          "enter": (60, 200), "exit": (30, 230)}},
                 {"key": "frag",    "name": "记忆碎片",   "pos": (150, 90),
                  "node": "frag",   "icon": "忆", "desc": "拾取一段发光的记忆",
                  "walk": {"bg": "sea", "npc_pos": (160, 190), "npc_name": "发光的碎片",
-                           "npc_img": "", "enter": (60, 200), "exit": (30, 230)}},
+                          "enter": (60, 200), "exit": (30, 230)}},
                 {"key": "finale",  "name": "挽歌",       "pos": (400, 210),
                  "node": "finale", "icon": "挽", "desc": "弹响终章挽歌",
                  "walk": {"bg": "sea_night", "npc_pos": (360, 195), "npc_name": "星光船",
-                           "npc_img": "", "enter": (60, 200), "exit": (30, 230)}},
+                          "enter": (60, 200), "exit": (30, 230)}},
             ]
         self.player = pygame.Vector2(config.W // 2, config.H * 0.60)
         self.near = None
@@ -96,7 +89,7 @@ class MapScene:
         if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
             mx, my = pygame.mouse.get_pos()
             mx, my = mx // config.SCALE, my // config.SCALE
-            for p in POIS:
+            for p in self.pois:
                 if p["key"] not in self.pois_done and \
                         math.hypot(mx - p["pos"][0], my - p["pos"][1]) < 24:
                     audio.play("ui_ok")
@@ -109,8 +102,8 @@ class MapScene:
             self._enter_poi(self.near)
         elif pygame.K_1 <= e.key <= pygame.K_6:          # 数字键直达探索点
             idx = e.key - pygame.K_1
-            if idx < len(POIS):
-                p = POIS[idx]
+            if idx < len(self.pois):
+                p = self.pois[idx]
                 if p["key"] not in self.pois_done:
                     audio.play("ui_ok")
                     self._enter_poi(p)
@@ -120,6 +113,7 @@ class MapScene:
         elif e.key in N.KEY_MAP:                # 地图任意处弹奏都有反馈
             note = N.KEY_MAP[e.key]
             audio.play("note_" + note)
+            audio.play_env(note)  # 播放环境音效
             c = config.NOTE_COLORS[note]
             for _ in range(6):
                 self.note_fx.append([self.player.x, self.player.y - 8,
@@ -178,38 +172,41 @@ class MapScene:
 
     # ------------------------------------------------------------- 绘制
     def _draw_bg(self, s):
-        """星球氛围背景（按星球色调）"""
+        """星球氛围背景（夜景模式）"""
         t = self.wdata.get("tone", (10, 16, 48))
+        # 夜景：大幅降低亮度，偏冷蓝调
+        night_t = (max(0, t[0] - 40), max(0, t[1] - 30), max(0, t[2] - 20))
         sea_top = config.H - 84
         for y in range(sea_top):
             k = y / sea_top
-            s.fill((min(255, int(t[0] * (1.4 - k * 0.5))),
-                    min(255, int(t[1] * (1.4 - k * 0.5))),
-                    min(255, int(t[2] * (1.4 - k * 0.5)))), (0, y, config.W, 1))
+            s.fill((min(255, int(night_t[0] * (1.2 - k * 0.4))),
+                    min(255, int(night_t[1] * (1.2 - k * 0.4))),
+                    min(255, int(night_t[2] * (1.2 - k * 0.4)))), (0, y, config.W, 1))
         for st in self.stars:
             st.draw(s)
         sea = pygame.Surface((config.W, 84), pygame.SRCALPHA)
         for y in range(84):
-            a = int(170 * (1 - y / 84))
-            sea.fill((min(255, t[0] + 16), min(255, t[1] + 40), min(255, t[2] + 60), a),
+            a = int(150 * (1 - y / 84))
+            sea.fill((min(255, night_t[0] + 10), min(255, night_t[1] + 25), min(255, night_t[2] + 45), a),
                      (0, y, config.W, 1))
         s.blit(sea, (0, sea_top))
         for wv in self.waves:
             x = int(wv["x"] + math.sin(self.t * 1.2 + wv["ph"]) * 8)
             y = sea_top + int((wv["ph"] * 37) % 70)
-            pygame.draw.ellipse(s, (90, 130, 190, 60), (x, y, 26, 3))
+            pygame.draw.ellipse(s, (70, 110, 170, 50), (x, y, 26, 3))
         ui.text(s, self.planet_name, (config.W // 2, 6), size=12,
-                color=(235, 225, 200), center=True)
+                color=(200, 215, 240), center=True)
 
     def draw(self, s):
         self._draw_bg(s)
         sea_top = config.H - 84
-        # 灯塔剪影
+        # 灯塔剪影（夜景）
         lx, ly = config.W - 46, sea_top - 42
-        pygame.draw.rect(s, (46, 52, 86), (lx - 3, ly + 12, 6, 40))
-        pygame.draw.rect(s, (46, 52, 86), (lx - 5, ly + 4, 10, 14))
+        pygame.draw.rect(s, (30, 36, 60), (lx - 3, ly + 12, 6, 40))
+        pygame.draw.rect(s, (30, 36, 60), (lx - 5, ly + 4, 10, 14))
         blink = 0.5 + 0.5 * math.sin(self.lamp_t * 1.6)
-        pygame.draw.circle(s, (255, 240, 180), (lx, ly), int(2 + blink * 3))
+        pygame.draw.circle(s, (255, 230, 160), (lx, ly), int(2 + blink * 3))
+        pygame.draw.circle(s, (255, 220, 140, 50), (lx, ly), int(6 + blink * 5))
         # 探索点
         for i, p in enumerate(self.pois):
             done = p["key"] in self.pois_done
@@ -233,12 +230,12 @@ class MapScene:
                 ui.gold_panel(s, box, alpha=150)
                 ui.text(s, f"[{i + 1}] {p['desc']}", box.center, size=8,
                         color=config.GOLD_HI, center=True)
-        # 玩家（聆星者剪影：深蓝斗篷 + 背琴）
+        # 玩家（聆星者剪影：夜景更亮的蓝紫调）
         px, py = int(self.player.x), int(self.player.y)
-        pygame.draw.circle(s, (70, 100, 180), (px, py - 8), 6)
-        pygame.draw.ellipse(s, (46, 66, 130), (px - 9, py - 4, 18, 14))
-        pygame.draw.rect(s, (232, 200, 120), (px + 7, py - 12, 3, 14))    # 背上竖琴
-        pygame.draw.circle(s, (255, 220, 150), (px + 8, py - 12), 2)
+        pygame.draw.circle(s, (100, 140, 220), (px, py - 8), 6)
+        pygame.draw.ellipse(s, (70, 100, 170), (px - 9, py - 4, 18, 14))
+        pygame.draw.rect(s, (255, 235, 180), (px + 7, py - 12, 3, 14))    # 背上竖琴
+        pygame.draw.circle(s, (255, 240, 200), (px + 8, py - 12), 2)
         # 音符反馈粒子
         for fx in self.note_fx:
             pygame.draw.circle(s, fx[4], (int(fx[0]), int(fx[1])), 2)
@@ -251,14 +248,14 @@ class MapScene:
         # 互动提示
         if self.near:
             p = self.near
-            idx = next((i for i, q in enumerate(POIS) if q["key"] == p["key"]), 0) + 1
+            idx = next((i for i, q in enumerate(self.pois) if q["key"] == p["key"]), 0) + 1
             ui.text(s, f"[{idx}] {p['desc']} · 按 E / 鼠标 / 数字键", (config.W // 2, config.H - 24),
                     size=12, color=config.GOLD_HI, center=True)
             pygame.draw.rect(s, config.GOLD_HI,
                              (int(p["pos"][0] - 14), int(p["pos"][1]) - 18, 28, 2))
         # HUD：进度
         done_n = len(self.pois_done)
-        total = len(POIS)
+        total = len(self.pois)
         ui.text(s, f"探索 {done_n}/{total} · 碎片 {len(self.fragments)}",
                 (10, 8), size=12, color=(170, 195, 235))
         mem = self.memory

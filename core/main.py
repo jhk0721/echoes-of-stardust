@@ -9,6 +9,7 @@ from core import config, audio, ui
 from core.combat import finale as F
 from core.combat import notes as N
 from core.combat import rhythm as R
+from core.story import ut
 from native import planet_shader as PS
 
 IMG = {}
@@ -150,13 +151,19 @@ class Game:
                     self.running = False
                 elif e.type == pygame.VIDEORESIZE:
                     self.screen = pygame.display.set_mode((e.w, e.h), pygame.RESIZABLE)
-                elif e.type == pygame.KEYDOWN and e.key == pygame.K_F11:
-                    self.fullscreen = not self.fullscreen
-                    if self.fullscreen:
-                        self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-                    else:
-                        self.screen = pygame.display.set_mode((config.SW, config.SH),
-                                                              pygame.RESIZABLE)
+                elif e.type == pygame.KEYDOWN:
+                    # 全局热键：Ctrl+S 手动存档
+                    if e.key == pygame.K_s and pygame.key.get_mods() & pygame.KMOD_CTRL:
+                        self._manual_save()
+                        continue
+                    if e.key == pygame.K_F11:
+                        self.fullscreen = not self.fullscreen
+                        if self.fullscreen:
+                            self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                        else:
+                            self.screen = pygame.display.set_mode((config.SW, config.SH),
+                                                                pygame.RESIZABLE)
+                        continue
                 elif self.scene:
                     self.scene.event(e)
             if self.scene:
@@ -167,6 +174,36 @@ class Game:
             pygame.transform.scale(self.surf, self.screen.get_size(), self.screen)
             pygame.display.flip()
         pygame.quit()
+
+    def _manual_save(self):
+        """Ctrl+S 手动存档"""
+        if self.scene and hasattr(self.scene, 'memory') and hasattr(self.scene, 'fragments'):
+            from core import save as S
+            from core.story.map_scene import MapScene
+            from core.story.scene import StoryScene
+            from core.story.walk_scene import WalkScene
+            d = S.load() or {}
+            if isinstance(self.scene, MapScene):
+                S.save({"planet": self.scene.planet_key, "scene": None,
+                        "fragments": self.scene.fragments, "memory": self.scene.memory,
+                        "pois": list(self.scene.pois_done), "done": False,
+                        "unlocked": d.get("unlocked", ["qianhai"]),
+                        "tutorial_done": d.get("tutorial_done", False),
+                        "mainline_done": d.get("mainline_done", False)})
+            elif isinstance(self.scene, StoryScene):
+                S.save({"planet": self.scene.planet_key, "scene": self.scene.scene_key,
+                        "fragments": self.scene.fragments, "memory": self.scene.memory,
+                        "pois": d.get("pois", []), "done": self.scene.state == "done",
+                        "unlocked": d.get("unlocked", ["qianhai"]),
+                        "tutorial_done": d.get("tutorial_done", False),
+                        "mainline_done": d.get("mainline_done", False)})
+            elif isinstance(self.scene, WalkScene):
+                S.save({"planet": self.scene.planet_key, "scene": self.scene.poi.get("key"),
+                        "fragments": self.scene.fragments, "memory": self.scene.memory,
+                        "pois": list(self.scene.pois_done), "done": False,
+                        "unlocked": d.get("unlocked", ["qianhai"]),
+                        "tutorial_done": d.get("tutorial_done", False),
+                        "mainline_done": d.get("mainline_done", False)})
 
 
 # 八种星球主色（亮色系：气态×3 / 岩石×3 / 类地×2）
@@ -286,7 +323,7 @@ class Staff:
     def __init__(self, w):
         self.base = 172          # 中下部，瀑布波浪（比底部上调）
         self.amp = 4
-        self.tilt = 0.05         # 从左到右倾斜（瀑布）
+        self.tilt = 0.07         # 从左到右倾斜（瀑布）
         self.notes = []
         for _ in range(12):
             self.notes.append({
@@ -382,19 +419,26 @@ class TitleScene:
 
     def pick(self, i):
         name = self.MENU[i]
+        from core import save as S
+        from core.story.planet_select import PlanetSelectScene
+        from core.story.scene import StoryScene
+        from core.story.map_scene import MapScene
         if name == "新旅程":
-            from core import save as S
             S.new_game()
-            from core.story.planet_select import PlanetSelectScene
-            self.game.set_scene(PlanetSelectScene())
+            self.game.set_scene(StoryScene("qianhai", "tutorial", mode="tutorial"))
         elif name == "继续聆听":
-            from core import save as S
             d = S.load()
             if d and d.get("planet"):
-                from core.story.map_scene import MapScene
-                from core.story.scene import StoryScene
-                if d.get("pois") is not None:
-                    self.game.set_scene(MapScene(d["memory"], d["fragments"], d["pois"]))
+                # 如果主线已通关，解锁星球选择
+                if d.get("mainline_done"):
+                    self.game.set_scene(PlanetSelectScene())
+                # 如果教程未完成，回到教程
+                elif not d.get("tutorial_done"):
+                    self.game.set_scene(StoryScene("qianhai", "tutorial", mode="tutorial"))
+                # 已有探索进度，回地图
+                elif d.get("pois") is not None:
+                    self.game.set_scene(MapScene(d["planet_key"] if "planet_key" in d else d["planet"],
+                                                d["memory"], d["fragments"], d["pois"]))
                 else:                                   # 旧档兼容：线性剧情
                     self.game.set_scene(StoryScene(d["planet"], d["scene"],
                                                    memory=d["memory"], fragments=d["fragments"]))
@@ -403,6 +447,13 @@ class TitleScene:
                 self.toast_t = 2.0
         elif name == "告别":
             self.game.running = False
+        elif name in ("星尘之书", "洛水桥边"):
+            d = S.load()
+            if d and d.get("mainline_done"):
+                self.game.set_scene(PlanetSelectScene())
+            else:
+                self.toast = f"{name} · 需完成主线五章后解锁"
+                self.toast_t = 2.0
         else:
             self.toast = f"{name} · 尚未解锁"
             self.toast_t = 2.0
@@ -518,6 +569,12 @@ class BattleScene:
         self.on_win = None          # 战斗胜利回调（剧情衔接）
         self.last_dir = pygame.Vector2(1, 0)        # 像素风方向发射
         self.bstars = [Star(config.W, config.H) for _ in range(40)]
+        # 玩家动画：使用 Undertale 风格精灵
+        self.player_frames = ut.get_char_frames("protagonist", scale=2)
+        self.player_frame_idx = 0
+        self.player_anim_timer = 0.0
+        self.player_dir = 'down'
+        self.player_moving = False
 
     def event(self, e):
         if self.over or e.type != pygame.KEYDOWN:
@@ -550,19 +607,25 @@ class BattleScene:
             self.composer = None; audio.play("ui_select")
 
     def fire(self, note):
+        if self.listening:
+            self._toast("聆听中 · 无法弹奏")
+            return
+        # 先判定共鸣：命中则本次弹奏伤害翻倍（设定集「共鸣——伤害翻倍」）
+        res = self.judge.press(note, self.game.now())
+        dmg = 20 if res == "hit" else 10
         # 方向发射：朝最近移动方向（上下左右移动即决定朝向）
         d = self.last_dir
         if d.length() == 0:
             d = self.epos - self.pos
         d = d.normalize() * 240
-        self.bolts.append([self.pos.x + 20, self.pos.y, d.x, d.y, note])
+        self.bolts.append([self.pos.x + 20, self.pos.y, d.x, d.y, note, dmg])
         audio.play("note_" + note)
-        res = self.judge.press(note, self.game.now())
+        audio.play_env(note)  # 播放环境音效
         if res == "hit":
             self.ling = min(3, self.ling + 1)
             self.flash = 0.12
             audio.play("resonance")
-            self._toast("共鸣 · 灵韵 +1")
+            self._toast("共鸣 · 伤害翻倍 · 灵韵 +1")
         elif res == "miss":
             self._toast("节奏偏了 · 未共鸣")
 
@@ -587,6 +650,7 @@ class BattleScene:
             if self.composer_t <= 0:
                 self.resolve_finale()
             return
+        self.listening = pygame.key.get_pressed()[pygame.K_u]
         ts = 0.3 if self.listening else 1.0
         k = pygame.key.get_pressed()
         sp = 130 * ts
@@ -604,6 +668,24 @@ class BattleScene:
             self.last_dir = pygame.Vector2(0, 1)
         self.pos.x = max(10, min(config.W - 10, self.pos.x))
         self.pos.y = max(10, min(config.H - 30, self.pos.y))
+        # 玩家动画更新
+        self.player_moving = any(k[key] for key in (pygame.K_a, pygame.K_d, pygame.K_w, pygame.K_s))
+        if k[pygame.K_a]:
+            self.player_dir = 'left'
+        elif k[pygame.K_d]:
+            self.player_dir = 'right'
+        elif k[pygame.K_w]:
+            self.player_dir = 'up'
+        elif k[pygame.K_s]:
+            self.player_dir = 'down'
+        if self.player_moving:
+            self.player_anim_timer += dt * 10
+            if self.player_anim_timer >= 1.0:
+                self.player_anim_timer -= 1.0
+                self.player_frame_idx = (self.player_frame_idx + 1) % 3
+        else:
+            self.player_frame_idx = 0
+            self.player_anim_timer = 0.0
         for b in self.bolts[:]:
             b[0] += b[2] * dt * ts
             b[1] += b[3] * dt * ts
@@ -611,7 +693,7 @@ class BattleScene:
                 self.bolts.remove(b)
             elif math.hypot(b[0] - self.epos.x, b[1] - self.epos.y) < 22:
                 self.bolts.remove(b)
-                self.hp -= 10
+                self.hp -= b[5]
                 self.fx.append([b[0], b[1], 0.45])
         self.cd -= dt
         if self.cd <= 0:
@@ -634,7 +716,6 @@ class BattleScene:
         if self.hp <= 0:
             self.over = "win"; self.over_t = 0
             audio.play("ui_ok")
-        self.listening = pygame.key.get_pressed()[pygame.K_u]
         audio.play_loop("bgm", 0.22)     # 战斗氛围乐
         for f2 in self.fx[:]:
             f2[2] -= dt
@@ -682,19 +763,26 @@ class BattleScene:
                 color=(190, 130, 160), center=True)
         pygame.draw.rect(s, (70, 30, 40), (ex - 40, ey - 44, 80, 4))
         pygame.draw.rect(s, (200, 90, 80), (ex - 40, ey - 44, int(80 * self.hp / self.maxhp), 4))
-        rn = "".join(N.NOTE_SYM[n] for n in self.e["notes"])
-        done = "".join(N.NOTE_SYM[n] for n in self.e["notes"][:self.judge.progress])
-        ui.text(s, rn, (ex, ey - 58), size=12, color=config.RHYTHM_GOLD, center=True)
-        ui.text(s, done, (ex, ey - 58), size=12, color=config.GOLD_HI, center=True)
-        harp_img = IMG.get("harp_real") or IMG.get("harp")
-        if harp_img:
-            hw = 40
-            hh = int(harp_img.get_height() * hw / harp_img.get_width())
-            key = ("harp_battle", hw, hh)
-            if key not in SCALE_CACHE:
-                SCALE_CACHE[key] = pygame.transform.smoothscale(harp_img, (hw, hh))
-            hf = SCALE_CACHE[key]
-            s.blit(hf, (int(self.pos.x - hw / 2), int(self.pos.y - hh / 2 + 8)))
+        if self.listening:
+            # 聆听时暴露敌人节奏型（设定集「慢动作中暴露破绽」）
+            rn = "".join(N.NOTE_SYM[n] for n in self.e["notes"])
+            done = "".join(N.NOTE_SYM[n] for n in self.e["notes"][:self.judge.progress])
+            ui.text(s, rn, (ex, ey - 58), size=12, color=config.RHYTHM_GOLD, center=True)
+            ui.text(s, done, (ex, ey - 58), size=12, color=config.GOLD_HI, center=True)
+        # 玩家：使用 Undertale 风格动画精灵
+        dir_frames = self.player_frames.get(self.player_dir, self.player_frames.get('down', []))
+        if dir_frames:
+            frame_idx = 0 if not self.player_moving else (self.player_frame_idx + 1)
+            frame_idx = min(frame_idx, len(dir_frames) - 1)
+            img = dir_frames[frame_idx]
+            w2, h2 = img.get_size()
+            s.blit(img, (int(self.pos.x - w2 / 2), int(self.pos.y - h2 + 4)))
+        else:
+            # 兜底：程序化绘制
+            pygame.draw.circle(s, (80, 115, 205), (int(self.pos.x), int(self.pos.y) - 8), 6)
+            pygame.draw.ellipse(s, (52, 76, 148), (int(self.pos.x) - 9, int(self.pos.y) - 4, 18, 14))
+            pygame.draw.rect(s, (235, 205, 130), (int(self.pos.x) + 7, int(self.pos.y) - 12, 3, 14))
+            pygame.draw.circle(s, (255, 225, 155), (int(self.pos.x) + 8, int(self.pos.y) - 12), 2)
         for i in range(self.ph):
             pygame.draw.circle(s, config.STAR, (int(self.pos.x - 20 + i * 10), int(self.pos.y - 40)), 3)
         for b in self.bolts:

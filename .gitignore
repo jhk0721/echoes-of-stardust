@@ -1,19 +1,39 @@
 # Python
 __pycache__/
 *.py[cod]
-*.egg-info/
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
 .venv/
 venv/
-
-# 运行时产物
-save.json
-_dl/
-docs/*.png
+env/
+ENV/
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
 # OS
-Thumbs.db
 .DS_Store
+Thumbs.db
+
+# Game specific
+save.json
+*.log
+
+# Assets (large files)
+assets/stardew/素材/星露谷物语素材/Stardew valley/Characters/*.png
+assets/undertale/Characters/*.png
+
+# Temp files
+*.tmp
+*.temp
+check_*.py
+fix_*.py
+test_*.py

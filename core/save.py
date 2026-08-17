@@ -13,7 +13,9 @@ DEFAULT = {
     "pois": [],            # 已完成的探索点
     "memory": {"主线": 0, "互动": 0, "残片": 0, "聆听": 0},
     "done": False,         # 是否完成挽歌
-    "unlocked": [],        # 已解锁星球
+    "unlocked": [],
+    "tutorial_done": False,  # 是否完成新手教程
+    "mainline_done": False,  # 是否完成主线5章
 }
 
 
@@ -40,7 +42,7 @@ def save(data):
 
 
 def new_game():
-    """新旅程：重置存档"""
-    save({"planet": None, "scene": None, "fragments": [], "memory": dict(DEFAULT["memory"]),
-          "done": False, "unlocked": ["qianhai"]})
+    """新旅程：重置存档，从教程开始"""
+    save({"planet": "qianhai", "scene": "tutorial", "fragments": [], "memory": dict(DEFAULT["memory"]),
+          "done": False, "unlocked": ["qianhai"], "tutorial_done": False, "mainline_done": False})
     return load()

@@ -6,70 +6,46 @@ import os
 import pygame
 
 from core import config, audio, ui
+from core.story import sd, ut
 
-NPC_DIR = "assets/_new/Lively_NPCs_v3.0/individual sprites/medieval"
-SEA_DIR = "assets/_new/FREE - Pixel Art Sidescroller Sea Backgrounds"
+NPC_DIR = os.path.join(config.BASE, "assets", "_new", "Lively_NPCs_v3.0",
+                       "individual sprites", "medieval")
+NEW_DIR = os.path.join(config.BASE, "assets", "_new")
+WR = os.path.join(NEW_DIR, "Bitcrawl_Free_Roguelike_v1", "Characters",
+                  "Normal_Outline_Sheet", "Animation_Normal_Outline_Wraith.png")
 
-# Sea 分层背景（1024×346，按层序叠加 → 缩放 480×270）
-_sea_cache = {}
 
-
-def _sea_layer(name):
-    if name in _sea_cache:
-        return _sea_cache[name]
-    import glob
-    p = glob.glob(f"{SEA_DIR}/**/{name}.png", recursive=True)
-    if not p:
+def _bg_img(name, planet_key="qianhai", tone=(10, 16, 48)):
+    """场景背景：优先星露谷瓦片拼接的星球专属背景，兜底旧素材"""
+    night = "night" in name
+    boat = "boat" in name
+    try:
+        return sd.scene_bg(planet_key, tone, night=night, boat=boat)
+    except Exception:
+        pass
+    if name.startswith("sea"):
         return None
-    img = pygame.image.load(p[0])
-    img = pygame.transform.scale(img, (config.W, config.H))
-    _sea_cache[name] = img
-    return img
-
-
-def _make_sea_bg(day=True, boat=False):
-    """组合海景：天空 + 远海 + 船 + 近海 + 云 + 太阳/月亮"""
-    s = pygame.Surface((config.W, config.H))
-    layers = ["BG_DAY" if day else "BG_NIGHT",
-              "OCEANB_DAY" if day else "OCEANB_NIGHT",
-              "BOAT" if boat else None,
-              "OCEANF_DAY" if day else "OCEANF_NIGHT",
-              "CLOUDS_DAY" if day else "CLOUDS_NIGHT",
-              "SUN_DAY" if day else "MOON_NIGHT"]
-    for L in layers:
-        if not L:
-            continue
-        img = _sea_layer(L)
-        if img:
-            s.blit(img, (0, 0))
-    return s
-
-
-def _bg_img(name):
-    if name == "sea_boat":
-        return _make_sea_bg(day=True, boat=True)
-    if name == "sea":
-        return _make_sea_bg(day=True)
-    if name == "sea_night":
-        return _make_sea_bg(day=False)
-    for root in ("assets/_new",):
-        p = os.path.join(root, name)
-        if os.path.exists(p):
-            img = pygame.image.load(p)
-            return pygame.transform.scale(img, (config.W, config.H))
+    p = os.path.join(NEW_DIR, name)
+    if os.path.exists(p):
+        img = pygame.image.load(p)
+        return pygame.transform.scale(img, (config.W, config.H))
     return None
 
 
-def _npc_img(path, size=(40, 48)):
-    """加载 NPC 图（支持切 Wraith 帧）"""
+def _npc_img(path, npc_name="记忆体", size=(32, 64)):
+    """NPC 图：优先星露谷角色站立帧，兜底旧素材/Wraith/光团"""
+    img = sd.char_idle(npc_name)
+    if img:
+        return img
     try:
-        if "Wraith" in path:
+        if path and "Wraith" in path:
             sheet = pygame.image.load(path).convert_alpha()
             img = sheet.subsurface((0, 0, 16, 16))
-        else:
+        elif path and os.path.exists(path):
             img = pygame.image.load(path).convert_alpha()
-        img = pygame.transform.scale(img, size)
-        return img
+        else:
+            return None
+        return pygame.transform.scale(img, size)
     except Exception:
         return None
 
@@ -80,17 +56,29 @@ class WalkScene:
     def __init__(self, poi, memory=None, fragments=None, pois_done=None, planet_key="qianhai"):
         self.poi = poi
         self.planet_key = planet_key
+        from core.story.worlds import WORLDS
+        self.tone = WORLDS.get(planet_key, {}).get("tone", (10, 16, 48))
         self.memory = memory or {"主线": 0, "互动": 0, "残片": 0, "聆听": 0}
         self.fragments = fragments or []
         self.pois_done = set(pois_done or [])
         w = poi.get("walk", {})
-        self.bg = _bg_img(w.get("bg", "sea"))
-        # 玩家：从入口进入
+        self.bg = _bg_img(w.get("bg", "sea"), planet_key, self.tone)
+        # 玩家：从入口进入，使用 Undertale 风格 4向走路动画
         self.player = pygame.Vector2(w.get("enter", (60, 200)))
+        self.player_frames = ut.get_char_frames("protagonist", scale=2)
+        self.player_frame_idx = 0
+        self.player_anim_timer = 0.0
+        self.player_dir = 'down'  # 当前朝向
+        self.player_moving = False
         # NPC：站在场景中
         self.npc_pos = w.get("npc_pos", (300, 130))
         self.npc_name = w.get("npc_name", "记忆体")
-        self.npc_img = _npc_img(w.get("npc_img", ""), w.get("npc_size", (40, 48)))
+        self.npc_img = _npc_img(w.get("npc_img", ""), self.npc_name,
+                                w.get("npc_size", (32, 64)))
+        # NPC 动作状态机
+        self.npc_action_type = ut.NPC_ACTIONS.get(self.npc_name, "idle")
+        self.npc_action_timer = 0.0
+        self.npc_action_frame = 0
         self.exit_pos = w.get("exit", (30, 230))
         self.t = 0.0
         self.toast = ""
@@ -134,18 +122,51 @@ class WalkScene:
         self.t += dt
         if self.toast_t > 0:
             self.toast_t -= dt
+        
+        # 玩家移动与动画
         k = pygame.key.get_pressed()
         sp = 95
+        dx = dy = 0
+        moving = False
         if k[pygame.K_a] or k[pygame.K_LEFT]:
-            self.player.x -= sp * dt
+            dx -= sp * dt
+            self.player_dir = 'left'
+            moving = True
         if k[pygame.K_d] or k[pygame.K_RIGHT]:
-            self.player.x += sp * dt
+            dx += sp * dt
+            self.player_dir = 'right'
+            moving = True
         if k[pygame.K_w] or k[pygame.K_UP]:
-            self.player.y -= sp * dt
+            dy -= sp * dt
+            self.player_dir = 'up'
+            moving = True
         if k[pygame.K_s] or k[pygame.K_DOWN]:
-            self.player.y += sp * dt
+            dy += sp * dt
+            self.player_dir = 'down'
+            moving = True
+        
+        self.player.x += dx
+        self.player.y += dy
         self.player.x = max(16, min(config.W - 16, self.player.x))
         self.player.y = max(50, min(config.H - 16, self.player.y))
+        
+        # 玩家走路动画
+        self.player_moving = moving
+        if moving:
+            self.player_anim_timer += dt * 10  # 10帧/秒
+            if self.player_anim_timer >= 1.0:
+                self.player_anim_timer -= 1.0
+                self.player_frame_idx = (self.player_frame_idx + 1) % 3  # 3个走路帧
+        else:
+            self.player_frame_idx = 0
+            self.player_anim_timer = 0.0
+        
+        # NPC 动作动画
+        self.npc_action_timer += dt
+        if self.npc_action_timer >= 0.5:  # 0.5秒切换一次动作帧
+            self.npc_action_timer -= 0.5
+            self.npc_action_frame = (self.npc_action_frame + 1) % 2
+        
         audio.play_loop("bgm", 0.28)
 
     # ------------------------------------------------------------- 绘制
@@ -167,19 +188,30 @@ class WalkScene:
             pygame.draw.circle(circ, (170, 205, 245, a), (rr, rr), rr)
             s.blit(circ, (int(nx - rr), int(ny - rr + 8)))
         if self.npc_img:
-            s.blit(self.npc_img, (int(nx - 20), int(ny - 40)))
+            w2, h2 = self.npc_img.get_size()
+            s.blit(self.npc_img, (int(nx - w2 / 2), int(ny - h2 + 6)))
         else:
             pygame.draw.circle(s, (200, 225, 255), (int(nx), int(ny)), 14)
         ui.text(s, self.npc_name, (int(nx), int(ny + 16)), size=12,
                 color=(235, 235, 250), center=True)
         if self.near_npc():
             pygame.draw.circle(s, config.GOLD_HI, (int(nx), int(ny)), 30, 1)
-        # 玩家（聆星者：蓝斗篷 + 背琴）
+        # 玩家（聆星者）：使用 4向走路动画
         px, py = int(self.player.x), int(self.player.y)
-        pygame.draw.circle(s, (80, 115, 205), (px, py - 8), 6)
-        pygame.draw.ellipse(s, (52, 76, 148), (px - 9, py - 4, 18, 14))
-        pygame.draw.rect(s, (235, 205, 130), (px + 7, py - 12, 3, 14))
-        pygame.draw.circle(s, (255, 225, 155), (px + 8, py - 12), 2)
+        dir_frames = self.player_frames.get(self.player_dir, self.player_frames.get('down', []))
+        if dir_frames:
+            # 站立帧是第0帧，走路帧是第1-3帧
+            frame_idx = 0 if not self.player_moving else (self.player_frame_idx + 1)
+            frame_idx = min(frame_idx, len(dir_frames) - 1)
+            img = dir_frames[frame_idx]
+            w2, h2 = img.get_size()
+            s.blit(img, (px - w2 // 2, py - h2 + 4))
+        else:
+            # 兜底：程序化绘制
+            pygame.draw.circle(s, (80, 115, 205), (px, py - 8), 6)
+            pygame.draw.ellipse(s, (52, 76, 148), (px - 9, py - 4, 18, 14))
+            pygame.draw.rect(s, (235, 205, 130), (px + 7, py - 12, 3, 14))
+            pygame.draw.circle(s, (255, 225, 155), (px + 8, py - 12), 2)
         # 提示
         if self.near_npc():
             ui.text(s, f"按 E · 与{self.npc_name}对话", (config.W // 2, config.H - 26),

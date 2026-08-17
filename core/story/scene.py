@@ -10,22 +10,17 @@ from core.story.planet import QIANHAI
 TYPE_SPEED = 22          # 打字机：字符/秒
 INTERACT_WAIT = 0.9      # 聆听互动最短时长
 
-# 场景背景配置：不同剧情节点 = 不同天空/海面/太阳/雾（像素氛围）
+# 场景背景配置：全夜景模式（所有场景统一为黑夜配色）
 BG = {
-    "tutorial": {"sky": (8, 12, 36), "sea": (16, 34, 80), "sun": None, "fog": 0.2, "lamp": False},
-    "open":     {"sky": (10, 16, 48), "sea": (18, 40, 90), "sun": None, "fog": 0.10, "lamp": True},
-    "mend_net": {"sky": (16, 26, 64), "sea": (24, 52, 104),
-                  "sun": (0.72, 0.20, (255, 220, 150)), "fog": 0.15, "lamp": False},
-    "find_oar": {"sky": (12, 16, 42), "sea": (16, 30, 72), "sun": None, "fog": 0.50, "lamp": False},
-    "battle":   {"sky": (6, 6, 22), "sea": (10, 12, 38), "sun": None, "fog": 0.30, "lamp": False},
-    "shells":   {"sky": (44, 26, 56), "sea": (86, 66, 96),
-                  "sun": (0.45, 0.28, (255, 190, 120)), "fog": 0.18, "lamp": False},
-    "night":    {"sky": (4, 6, 20), "sea": (10, 18, 46), "sun": None, "fog": 0.08,
-                  "lamp": True, "rain": True, "sit": True},
-    "farewell": {"sky": (34, 22, 32), "sea": (56, 44, 64),
-                  "sun": (0.50, 0.34, (255, 140, 90)), "fog": 0.25,
-                  "rain": True, "sunrise": True},
-    "finale":   {"sky": (8, 14, 42), "sea": (22, 48, 92), "sun": None, "fog": 0.18, "lamp": False},
+    "tutorial": {"sky": (4, 6, 20), "sea": (10, 18, 46), "sun": None, "fog": 0.15, "lamp": False, "rain": False},
+    "open":     {"sky": (4, 6, 20), "sea": (10, 18, 46), "sun": None, "fog": 0.10, "lamp": True, "rain": False},
+    "mend_net": {"sky": (6, 8, 24), "sea": (12, 22, 52), "sun": None, "fog": 0.20, "lamp": True, "rain": True},
+    "find_oar": {"sky": (5, 7, 22), "sea": (10, 18, 44), "sun": None, "fog": 0.55, "lamp": False, "rain": False},
+    "battle":   {"sky": (3, 3, 18), "sea": (8, 10, 34), "sun": None, "fog": 0.40, "lamp": False, "rain": False},
+    "shells":   {"sky": (4, 6, 20), "sea": (10, 18, 46), "sun": None, "fog": 0.15, "lamp": True, "rain": False},
+    "night":    {"sky": (3, 4, 16), "sea": (8, 14, 40), "sun": None, "fog": 0.08, "lamp": True, "rain": True, "sit": True},
+    "farewell": {"sky": (4, 6, 18), "sea": (10, 16, 42), "sun": None, "fog": 0.20, "lamp": False, "rain": True},
+    "finale":   {"sky": (5, 8, 24), "sea": (14, 28, 56), "sun": None, "fog": 0.18, "lamp": False, "rain": False},
 }
 
 
@@ -52,8 +47,9 @@ class StoryScene:
         self.scene = scenes[scene_key]
         # 背景：星球色调
         t = w.get("tone", (10, 16, 48))
-        self.bg = {"sky": t, "sea": tuple(min(255, c + 24) for c in t),
-                   "sun": None, "fog": 0.12, "lamp": False}
+        # 使用场景专属夜景配置
+        self.bg = dict(BG.get(scene_key, {"sky": t, "sea": tuple(min(255, c + 24) for c in t),
+                                          "sun": None, "fog": 0.12, "lamp": False}))
         self.mode = mode                # story 线性 / poi 探索点 / tutorial 教程
         self.poi_key = poi_key
         self.flash = 0.0                # 互动成功白闪
@@ -83,6 +79,10 @@ class StoryScene:
                       for _ in range(60)]
         self.ship_parts = []
         self._ship_phase = 0
+        # 渔网出水动画（mend_net 专用）
+        self.net_rise = 0.0        # 0-1 进度
+        self.net_splash = []       # 水花粒子
+        self.net_sound_played = False
 
     # ------------------------------------------------------------------ 事件
     def event(self, e):
@@ -117,7 +117,14 @@ class StoryScene:
         it = self.scene["interact"]
         if it["type"] == "note" and e.key == self._note_key(it["note"]):
             audio.play("note_" + it["note"])
-            self._finish_interact()
+            # 渔网出水特殊处理：启动动画而非立即结束
+            if self.scene_key == "mend_net" and it["note"] == "water":
+                self.net_rise = 0.0
+                self.net_splash = []
+                self.net_sound_played = False
+                self.state = "net_rise"  # 特殊状态：渔网上升
+            else:
+                self._finish_interact()
         elif it["type"] == "listen" and e.key == pygame.K_u:
             audio.play("resonance")
             self._finish_interact()
@@ -152,7 +159,6 @@ class StoryScene:
             self._start_battle(sc["battle"])
         elif sc.get("finale"):
             self.state = "finale"
-            self._ship_phase = 0
         else:
             self._advance_scene()
 
@@ -224,10 +230,17 @@ class StoryScene:
     def _poi_done(self):
         """探索点完成：标记 + 存档 + 回地图"""
         from core import save as S
+        from core.story.map_scene import POIS
         d = S.load() or {}
         pois = list(d.get("pois", []))
         if self.poi_key and self.poi_key not in pois:
             pois.append(self.poi_key)
+        # 如果是终章场景，标记该星球所有 POI 为完成
+        if self.scene_key == "finale" or self.scene.get("finale"):
+            all_poi_keys = [p["key"] for p in POIS]
+            for k in all_poi_keys:
+                if k not in pois:
+                    pois.append(k)
         # 教程节点也计入主线记忆
         dim = self.scene.get("dim")
         if dim:
@@ -236,17 +249,24 @@ class StoryScene:
         if frag and frag not in self.fragments:
             self.fragments.append(frag)
             self._toast(f"获得记忆残片 · {frag}")
+        # 教程模式：完成后标记 tutorial_done，进入地图
+        tutorial_done = d.get("tutorial_done", False)
+        if self.mode == "tutorial":
+            tutorial_done = True
         S.save({"planet": self.planet_key, "scene": self.scene_key,
                 "fragments": self.fragments, "memory": self.memory,
-                "pois": pois, "done": False, "unlocked": [self.planet_key]})
+                "pois": pois, "done": False, "unlocked": [self.planet_key],
+                "tutorial_done": tutorial_done, "mainline_done": d.get("mainline_done", False)})
         from core.story.map_scene import MapScene
         self.game.set_scene(MapScene(self.planet_key, self.memory, self.fragments, pois))
 
     def _save(self):
         from core import save as S
+        d = S.load() or {}
         S.save({"planet": self.planet_key, "scene": self.scene_key,
                 "fragments": self.fragments, "memory": self.memory,
-                "done": self.state == "done", "unlocked": [self.planet_key]})
+                "done": self.state == "done", "unlocked": [self.planet_key],
+                "tutorial_done": d.get("tutorial_done", False), "mainline_done": d.get("mainline_done", False)})
 
     def _back_title(self):
         from core.main import TitleScene
@@ -290,6 +310,35 @@ class StoryScene:
                     d["x"] = random.uniform(0, config.W + 20)
         if self.state == "lines" and self.typing:
             self.char_i += TYPE_SPEED * dt
+        # 渔网出水动画（mend_net 专用）
+        if self.state == "net_rise":
+            self.net_rise += dt * 1.5  # 约 0.67 秒完成
+            if not self.net_sound_played and self.net_rise > 0.1:
+                # 播放破水音效（使用现有的水音效或共鸣音效）
+                audio.play("resonance")  # 暂用共鸣音效代替破水声
+                self.net_sound_played = True
+                # 生成水花粒子
+                for _ in range(20):
+                    self.net_splash.append({
+                        "x": config.W // 2 + random.uniform(-40, 40),
+                        "y": config.H - 80 + random.uniform(-10, 10),
+                        "vx": random.uniform(-60, 60),
+                        "vy": random.uniform(-120, -40),
+                        "life": random.uniform(0.5, 1.2),
+                        "size": random.uniform(2, 5),
+                        "color": random.choice([(100, 180, 255), (140, 200, 255), (180, 220, 255)])
+                    })
+            # 更新水花粒子
+            for sp in self.net_splash[:]:
+                sp["x"] += sp["vx"] * dt
+                sp["y"] += sp["vy"] * dt
+                sp["vy"] += 200 * dt  # 重力
+                sp["life"] -= dt
+                if sp["life"] <= 0:
+                    self.net_splash.remove(sp)
+            if self.net_rise >= 1.0:
+                self.net_rise = 1.0
+                self._finish_interact()
         if self.state == "finale":
             self._update_ship(dt)
             if self.ship_t > 4.5 and not self.done_played:
@@ -449,8 +498,35 @@ class StoryScene:
         ui.text(s, who, (int(x), int(y + r + 12)), size=12,
                 color=(190, 215, 250), center=True)
 
+    def _wrap_text(self, text, font_size, max_width):
+        """自动换行：将长文本按宽度拆分为多行"""
+        font = ui.load_font(font_size)
+        words = text.split(' ')
+        lines = []
+        current_line = ""
+        for word in words:
+            test_line = current_line + (" " if current_line else "") + word
+            w, _ = font.size(test_line)
+            if w <= max_width:
+                current_line = test_line
+            else:
+                if current_line:
+                    lines.append(current_line)
+                current_line = word
+        if current_line:
+            lines.append(current_line)
+        return lines
+
+    def _get_dialog_pages(self, text, font_size=12):
+        """获取对话分页：每页最多 2 行"""
+        lines = self._wrap_text(text, font_size, config.W - 36)
+        pages = []
+        for i in range(0, len(lines), 2):
+            pages.append(lines[i:i+2])
+        return pages
+
     def _draw_dialog(self, s):
-        # 底部紧凑对话框：说话人 + 打字机文本
+        # 底部紧凑对话框：说话人 + 打字机文本（支持自动换行+分页）
         who = ""
         if self._lines():
             who = self._lines()[min(self.line_i, len(self._lines()) - 1)].get("who", "")
@@ -461,14 +537,48 @@ class StoryScene:
         text = ""
         if self._lines():
             text = self._lines()[min(self.line_i, len(self._lines()) - 1)].get("text", "")
-        shown = text[:int(self.char_i)]
-        ui.text(s, shown, (18, config.H - 38), size=12, color=config.STAR)
-        # 提示箭头
-        if self.char_i >= len(text):
-            blink = 0.5 + 0.5 * math.sin(self.t * 5)
-            if blink > 0.3:
-                ui.text(s, "▼", (config.W - 22, config.H - 20), size=10,
-                        color=config.GOLD if self.state == "lines" else (100, 120, 160))
+        
+        # 分页处理
+        if not hasattr(self, 'dialog_pages'):
+            self.dialog_pages = self._get_dialog_pages(text)
+            self.dialog_page = 0
+            self.dialog_page_char = 0
+        # 如果文本变化，重新分页
+        elif self.dialog_pages and self._get_dialog_pages(text) != self.dialog_pages:
+            self.dialog_pages = self._get_dialog_pages(text)
+            self.dialog_page = 0
+            self.dialog_page_char = 0
+        
+        # 打字机效果：逐字符显示当前页
+        if self.dialog_pages and self.dialog_page < len(self.dialog_pages):
+            page_lines = self.dialog_pages[self.dialog_page]
+            full_page_text = "\n".join(page_lines)
+            shown = full_page_text[:int(self.dialog_page_char)]
+            self.dialog_page_char += TYPE_SPEED * (1/60)  # 近似帧率
+            if self.dialog_page_char >= len(full_page_text):
+                self.dialog_page_char = len(full_page_text)
+                # 页内打字完成，显示翻页提示
+                if self.dialog_page < len(self.dialog_pages) - 1:
+                    blink = 0.5 + 0.5 * math.sin(self.t * 5)
+                    if blink > 0.3:
+                        ui.text(s, "▼", (config.W - 22, config.H - 20), size=10, color=config.GOLD)
+                else:
+                    # 最后一页，显示继续提示
+                    if self.char_i >= len(text):
+                        blink = 0.5 + 0.5 * math.sin(self.t * 5)
+                        if blink > 0.3:
+                            ui.text(s, "▼", (config.W - 22, config.H - 20), size=10,
+                                    color=config.GOLD if self.state == "lines" else (100, 120, 160))
+            # 绘制当前页（支持多行）
+            y_offset = config.H - 38
+            for line in shown.split('\n'):
+                ui.text(s, line, (18, y_offset), size=12, color=config.STAR)
+                y_offset += 16
+        else:
+            # 兜底：单行显示
+            shown = text[:int(self.char_i)]
+            ui.text(s, shown, (18, config.H - 38), size=12, color=config.STAR)
+        
         # 选项
         if self.state == "choices":
             for i, ch in enumerate(self._choices()):
@@ -478,6 +588,10 @@ class StoryScene:
                         color=config.GOLD_HI if i == self.sel else config.GOLD, center=True)
 
     def _draw_interact(self, s):
+        # 渔网出水动画绘制
+        if self.state == "net_rise":
+            self._draw_net_rise(s)
+            return
         # 互动提示条
         it = self.scene.get("interact")
         if not it:
@@ -494,6 +608,35 @@ class StoryScene:
         else:
             ui.text(s, "按住 U", (config.W // 2, 108), size=24,
                     color=config.AURA, center=True)
+
+    def _draw_net_rise(self, s):
+        """绘制渔网出水动画：网上升 + 水花粒子"""
+        sea_top = config.H - 90
+        net_y = sea_top + 30 - self.net_rise * 80  # 从水面下升起
+        net_x = config.W // 2
+        
+        # 绘制水花粒子
+        for sp in self.net_splash:
+            alpha = int(255 * max(0, sp["life"]))
+            color = (*sp["color"], alpha)
+            circ = pygame.Surface((sp["size"] * 2, sp["size"] * 2), pygame.SRCALPHA)
+            pygame.draw.circle(circ, color, (sp["size"], sp["size"]), sp["size"])
+            s.blit(circ, (int(sp["x"] - sp["size"]), int(sp["y"] - sp["size"])))
+        
+        # 绘制渔网（菱形网格）
+        net_w, net_h = 60, 40
+        cols, rows = 6, 4
+        for i in range(cols + 1):
+            x = net_x - net_w // 2 + i * net_w / cols
+            pygame.draw.line(s, (180, 200, 230), (x, net_y), (x, net_y + net_h), 1)
+        for j in range(rows + 1):
+            y = net_y + j * net_h / rows
+            pygame.draw.line(s, (180, 200, 230), (net_x - net_w // 2, y), (net_x + net_w // 2, y), 1)
+        # 网边框
+        pygame.draw.rect(s, (140, 170, 200), (net_x - net_w // 2, net_y, net_w, net_h), 2)
+        
+        # 提示文本
+        ui.text(s, "渔网破水而出……", (config.W // 2, 60), size=16, color=config.GOLD_HI, center=True)
 
     def _draw_finale(self, s):
         # 星光船 + 字幕

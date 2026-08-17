@@ -9,6 +9,13 @@ _sounds = {}
 # UI 音效别名：程序化名字 → Kenney 真实音效
 _ALIAS = {"ui_move": "rollover1", "ui_ok": "click1", "ui_select": "click2"}
 
+# 环境音效映射：四元素音符 -> 环境音效
+ENV_SOUNDS = {
+    "wind": "wind_ambient",    # 刮风声
+    "fire": "fire_ambient",    # 火焰声
+    "water": "water_splash",   # 破水声/水流声
+    "earth": "earth_ambient",  # 落石声/震动声
+}
 
 def load_all():
     """加载程序化 wav（Kenney ogg 按需懒加载，省内存）"""
@@ -24,10 +31,11 @@ def load_all():
             except Exception:
                 pass
 
-
 _missed = set()
 _loops = {}
 
+# 环境音效通道（用于同时播放多个环境音）
+_env_channels = {}
 
 def play_loop(name, vol=0.5):
     """循环播放（雨声/环境声）"""
@@ -40,13 +48,25 @@ def play_loop(name, vol=0.5):
             ch.set_volume(vol)
             _loops[key] = ch
 
+def play_env(note, vol=0.6):
+    """播放四元素对应的环境音效（非循环，可叠加）"""
+    env_name = ENV_SOUNDS.get(note)
+    if not env_name:
+        return
+    _lazy(env_name)
+    s = _sounds.get(env_name)
+    if s:
+        # 使用专用通道避免互相打断
+        ch = s.play()
+        if ch:
+            ch.set_volume(vol)
+            _env_channels[note] = ch
 
 def stop_loop(name):
     key = _ALIAS.get(name, name)
     ch = _loops.pop(key, None)
     if ch:
         ch.stop()
-
 
 def stop_all_loops():
     for ch in _loops.values():
@@ -55,7 +75,6 @@ def stop_all_loops():
         except Exception:
             pass
     _loops.clear()
-
 
 def _lazy(name):
     """按需加载音效（程序化 wav + Kenney ogg，首次播放时）"""
@@ -81,7 +100,6 @@ def _lazy(name):
                     pass
     _missed.add(name)
 
-
 def play(name, vol=1.0):
     key = _ALIAS.get(name, name)
     _lazy(key)
@@ -89,7 +107,6 @@ def play(name, vol=1.0):
     if s:
         s.set_volume(vol)
         s.play()
-
 
 def has(name):
     return name in _sounds

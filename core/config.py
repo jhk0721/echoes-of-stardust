@@ -13,12 +13,18 @@ KENNEY_AUDIO = os.path.join(ASSETS, "audio", "kenney")
 KENNEY2_AUDIO = os.path.join(ASSETS, "audio", "kenney2")
 DOCS = os.path.join(BASE, "docs")
 NATIVE = os.path.join(BASE, "native")
+STARDEW = os.path.join(ASSETS, "stardew", "素材", "星露谷物语素材", "Stardew valley")
+UNDERTALE = os.path.join(ASSETS, "undertale")
 
 # --- 分辨率 ---
 W, H = 480, 270          # 逻辑分辨率（像素风）
 SCALE = 3                # 整数倍放大
 SW, SH = W * SCALE, H * SCALE  # 实际窗口
 FPS = 60
+
+# --- 转场配置 ---
+TRANSITION_FADE_DURATION = 0.3
+TRANSITION_SLIDE_DURATION = 0.4
 
 # --- 调色板（记忆星球配色体系）---
 INK     = (0, 0, 0)       # 纯黑宇宙底
@@ -48,3 +54,29 @@ FONT_PIXEL = os.path.join(FONTS, "fusion-pixel-10px-proportional-zh_hans.ttf")
 FONT_PIXEL_12 = os.path.join(FONTS, "fusion-pixel-12px-monospaced-zh_hans.ttf")
 FONT_PIXEL_8 = os.path.join(FONTS, "fusion-pixel-8px-monospaced-zh_hans.ttf")
 FONT_CHAIN = ["microsoftyahei", "msyh", "simhei", "simsun", "dengxian", "freesansbold"]
+
+# --- 音符按键映射 ---
+NOTE_KEY_MAP = {
+    "wind":  "j",
+    "fire":  "k",
+    "water": "l",
+    "earth": "i",
+}
+
+# --- 玩家移动速度 ---
+PLAYER_SPEED = 130
+
+# --- 战斗参数 ---
+BATTLE_PLAYER_HP = 5
+BATTLE_ENEMY_BASE_HP = 100
+RESONANCE_DMG_MULT = 2.0
+
+# --- 存档路径 ---
+SAVE_PATH = os.path.join(BASE, "save.json")
+
+# --- 星球顺序（主线+自由探索）---
+PLANET_ORDER = [
+    "qianhai", "storm_city", "notre_dame", "flat", "finale_world",
+    "qiancao", "kassel", "friends", "library", "ward",
+    "math", "alive", "ditan", "paper_boat", "sea_old", "b612"
+]

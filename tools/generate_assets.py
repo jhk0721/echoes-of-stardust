@@ -27,12 +27,12 @@ def _sine(freq, dur, vol=0.5, decay=6.0, overtones=()):
     return out
 
 
-def _save_wav(name, samples):
+def _save_wav(name, samples, rate=44100):
     path = os.path.join(config.AUDIO, name + ".wav")
     with wave.open(path, "w") as w:
         w.setnchannels(1)
         w.setsampwidth(2)
-        w.setframerate(44100)
+        w.setframerate(rate)
         w.writeframes(struct.pack("<%dh" % len(samples), *samples))
 
 
@@ -68,7 +68,7 @@ def gen_audio():
         prev = 0.92 * prev + 0.08 * w
         rain.append(int(14000 * (0.7 * prev + 0.3 * w)))
     _save_wav("rain", rain)
-    # BGM：竖琴风氛围琶音（A 小调分解和弦，8 秒循环）
+    # BGM：竖琴风氛围琶音（Am-F-C-G 分解和弦，16 秒循环，22050Hz）
     gen_bgm()
 
 
@@ -111,7 +111,7 @@ def gen_bgm():
     for k in range(rate // 2):
         out[k] = int(out[k] * k / (rate // 2))
         out[n - 1 - k] = int(out[n - 1 - k] * k / (rate // 2))
-    _save_wav("bgm", out)
+    _save_wav("bgm", out, rate=rate)
 
 
 # ---------- 精灵图：几何绘制 ----------
